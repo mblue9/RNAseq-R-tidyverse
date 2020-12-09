@@ -1,4 +1,4 @@
-url: https://stemangiola.github.io/ABACBS2020_tidytranscriptomics
+url: https://mblue9.github.io/RNAseq-R-tidyverse
 
 template:
   params:
@@ -6,26 +6,19 @@ template:
     ganalytics: UA-93043521-1
 
 home:
-  title: "TidyTranscriptomics"
+  title: "RNAseq-R-tidyverse"
   type: inverse
-  
-toc:
-  depth: 4
   
 navbar:
   title: ~
   type: default
   left:
-    - text: Background
-      href: articles/background.html
-    - text: Workshop
+    - text: Material
       href: articles/tidytranscriptomics.html
-    - text: Solutions 
-      href: articles/solutions.html
 
   right:
    - icon: fa-github
-     href: https://github.com/stemangiola/ABACBS2020_tidytranscriptomics
+     href: https://github.com/mblue9/RNAseq-R-tidyverse
    - icon: fa-docker
-     href: https://hub.docker.com/repository/docker/stemangiola/ABACBS2020_tidytranscriptomics
+     href: https://hub.docker.com/repository/docker/mblue9/RNAseq-R-tidyverse
     

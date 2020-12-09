@@ -1,15 +1,15 @@
-Package: ABACBS2020tidytranscriptomics
-Title: Introduction to Tidy Transcriptomics
-Version: 0.2.2
+Package: RNAseqRtidyverse
+Title: RNA-
+Version: 0.0.1
 Authors@R: c(
     person("Maria", "Doyle", email="maria.doyle@petermac.org",
-    role = c("aut"),
+    role = c("aut", "cre"),
     comment = c(ORCID = "0000-0003-4847-8436")),
     person("Stefano", "Mangiola", email="mangiola.s@wehi.edu.au",
-    role = c("aut","cre"),
+    role = c("aut"),
     comment = c(ORCID = "0000-0001-7474-836X")))
 Maintainer: Maria Doyle <maria.doyle@petermac.org>, Stefano Mangiola <mangiola.s@wehi.edu.au>
-Description: This workshop will present how to perform analysis of RNA sequencing data following the tidy data paradigm, using the tidybulk, tidyseurat, tidyHeatmap and tidyverse packages.
+Description: This training material presents how to perform analysis of RNA sequencing data following the tidy data paradigm, using the tidybulk, tidyHeatmap and tidyverse packages.
 License: CC BY-SA 4.0 + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -20,12 +20,7 @@ Depends:
 Imports:
     tidybulk,
     tidygate,
-    Seurat,
-    tidyseurat,
     tidyHeatmap,
-    tidySingleCellExperiment,
-    SingleCellExperiment,
-    SummarizedExperiment,
     stats,
     utils,
     tibble,
@@ -34,42 +29,24 @@ Imports:
     dplyr,
     readr,
     tidyr,
-    purrr,
     forcats,
     limma,
     edgeR,
     DESeq2,
     ggrepel,
-    airway,
-    org.Hs.eg.db,
-    org.Dm.eg.db,
+    org.Mm.eg.db,
     AnnotationDbi,
     dittoSeq,
     GGally,
     plotly,
-    survival,
-    SingleR,
-    scran,
-    scater,
-    uwot,
-    igraph,
     acepack,
-    e1071,
-    broom,
-    scuttle,
-    EnsDb.Hsapiens.v86,
-    celldex,
-    devtools,
-    rlang,
-    magrittr,
-    ggbeeswarm
 Suggests:
     knitr,
     rmarkdown,
     pkgdown
 Biarch: true
-biocViews: RNASeq, DifferentialExpression, GeneExpression, Normalization, Clustering, QualityControl, Sequencing, SingleCell, Transcription, Transcriptomics
-URL: https://stemangiola.github.io/ABACBS2020_tidytranscriptomics/
-BugReports: https://github.com/stemangiola/ABACBS2020_tidytranscriptomics/issues/new/choose
+biocViews: RNASeq, DifferentialExpression, GeneExpression, Normalization, Clustering, QualityControl, Sequencing, Transcription, Transcriptomics
+URL: https://mblue9.github.io/RNAseq-R-tidyverse/
+BugReports: https://github.com/mblue9/RNAseq-R-tidyverse/issues/new/choose
 VignetteBuilder: knitr
-DockerImage: stemangiola/ABACBS2020_tidytranscriptomics:ABACBS2020
+DockerImage: mblue9/RNAseq-R-tidyverse:latest
