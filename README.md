@@ -1,6 +1,6 @@
 <!-- badges: start -->
 [![DOI](https://zenodo.org/badge/306182457.svg)](https://zenodo.org/badge/latestdoi/306182457)
-[![.github/workflows/basic_checks.yaml](https://github.com/mblue9/RNAseq-R-tidyverse/workflows/.github/workflows/basic_checks.yaml/badge.svg)](https://github.com/mblue9/RNAseq-R-tidyverse/actions) [![Docker](https://github.com/Bioconductor/BioC2020/raw/master/docs/images/docker_icon.png)](https://hub.docker.com/repository/docker/mblue9/RNAseq-R-tidyverse) 	
+[![.github/workflows/basic_checks.yaml](https://github.com/mblue9/RNAseq-R-tidyverse/workflows/.github/workflows/basic_checks.yaml/badge.svg)](https://github.com/mblue9/RNAseq-R-tidyverse/actions) [![Docker](https://github.com/Bioconductor/BioC2020/raw/master/docs/images/docker_icon.png)](https://hub.docker.com/repository/docker/mblue9/rnaseq-r-tidyverse) 	
 <!-- badges: end -->
 
 # RNAseq-R-tidyverse 
@@ -26,7 +26,7 @@ This is necessary in order to reproduce the code shown in the training material.
 If you're familiar with [Docker](https://docs.docker.com/get-docker/) you could use the Docker image which has all the software pre-configured to the correct versions.
 
 ```
-docker run -e PASSWORD=abc -p 8787:8787 mblue9/RNAseq-R-tidyverse:latest
+docker run -e PASSWORD=abc -p 8787:8787 mblue9/rnaseq-r-tidyverse:latest
 ```
 
 Once running, navigate to <http://localhost:8787/> and then login with

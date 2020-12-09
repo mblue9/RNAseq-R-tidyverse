@@ -49,4 +49,4 @@ biocViews: RNASeq, DifferentialExpression, GeneExpression, Normalization, Cluste
 URL: https://mblue9.github.io/RNAseq-R-tidyverse/
 BugReports: https://github.com/mblue9/RNAseq-R-tidyverse/issues/new/choose
 VignetteBuilder: knitr
-DockerImage: mblue9/RNAseq-R-tidyverse:latest
+DockerImage: mblue9/rnaseq-r-tidyverse:latest
