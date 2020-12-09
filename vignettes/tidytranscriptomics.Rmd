@@ -101,11 +101,9 @@ custom_theme <-
 
 ### Setting up the data
 
-Here we will perform our analysis using the data from the *airway* package. The airway data comes from the paper by [@himes2014rna]; and it includes 8 samples from human airway smooth muscle cells, from 4 cell lines. For each cell line treated (with dexamethasone) and untreated (negative control) a sample has undergone RNA sequencing and gene counts have been generated.
+Here we will perform RNA-Seq analysis using data from a breast cancer research study, from the paper by [Fu et al. 2015](https://www.ncbi.nlm.nih.gov/pubmed/25730472), GEO code GSE60450. This study examined gene expression in basal and luminal cells from mice at different stages of mammary gland development (virgin, pregnant and lactating). There are 2 samples per group and 6 groups, 12 samples in total.
 
-The airway data is stored as a Bioconductor *RangedSummarizedExperiment* object. We will convert this object into a tidybulk tibble. A tibble is the tidyverse table format.
-
-In this workshop we will be using the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it reduces the amount of code we need to write when we have multiple steps (as we'll see later). It also can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
+We will be using the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it reduces the amount of code we need to write when we have multiple steps (as we'll see later). It also can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
 
 ```{r}
 # import RNA-seq counts
@@ -513,7 +511,9 @@ If we just wanted to run one differential testing method we could do that. The d
 
 ```{r}
 counts_de <- counts_scal_MDS %>%
-  test_differential_abundance(~ dex + cell)
+    test_differential_abundance(~ 0 + Group,
+                                .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate"),
+                                omit_contrast_in_colnames = TRUE)
 ```
 
 Tidybulk enables a simplified way of performing an RNA sequencing differential expression analysis (with the benefit of smoothly integrating with ggplot2 and other tidyverse packages). Compare the code for a tidybulk edgeR analysis versus standard edgeR below.
@@ -598,7 +598,7 @@ strip_chart <-
   filter(symbol %in% topgenes_symbols) %>%
 
   # make faceted stripchart
-  ggplot(aes(x = dex, y = counts_scaled + 1, fill = dex, label = sample)) +
+  ggplot(aes(x = Group, y = counts_scaled + 1, fill = Group, label = sample)) +
   geom_boxplot() +
   geom_jitter() +
   facet_wrap(~symbol) +
