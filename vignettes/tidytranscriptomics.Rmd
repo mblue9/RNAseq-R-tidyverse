@@ -3,6 +3,7 @@ title: "RNAseq-R-tidyverse"
 author:
   - Maria Doyle, Peter MacCallum Cancer Centre^[<maria.doyle at petermac.org>]
   - Stefano Mangiola, Walter and Eliza Hall Institute^[<mangiola.s at wehi.edu.au>]
+date: "`r format(Sys.time(), '%d %B %Y')`" 
 output: rmarkdown::html_vignette
 bibliography: "`r file.path(system.file(package='RNAseqRtidyverse', 'vignettes'), 'tidytranscriptomics.bib')`"
 vignette: >
