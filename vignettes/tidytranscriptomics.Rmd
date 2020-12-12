@@ -134,7 +134,7 @@ The CellType column tells us whether the samples are from basal or luminal cells
 
 We'll create a column containing the groups we'll be examining e.g. basal.pregnant and basal.lactate by joining the CellType and Status columns using `unite`. We'll use `mutate` to edit the sample id so we can join to the counts.
 
-Here we make use of the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it can reduce the amount of code we need to type and the number of temporary variables we have to create. It also can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
+Here we make use of the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
 
 ```{r}
 sampleinfo_formatted <- sampleinfo %>%
@@ -152,7 +152,7 @@ sampleinfo_formatted
 To the counts table we can add gene symbols.
 
 ```{r}
-countdata <- 
+countdata <- countdata %>%
     # convert ids from numeric to character (text) datatype
     mutate(EntrezGeneID = as.character(EntrezGeneID)) %>%
     
