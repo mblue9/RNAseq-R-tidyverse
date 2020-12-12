@@ -29,9 +29,7 @@ background-color: #fff4d4;
 	background-color: #fff4d4;
 }
 ```
-
-
-This workshop will present how to perform analysis of RNA sequencing data following the tidy data paradigm [@wickham2014tidy]. The tidy data paradigm provides a standard way to organise data values within a dataset, where each variable is a column, each observation is a row, and data is manipulated using an easy-to-understand vocabulary. Most importantly, the data structure remains consistent across manipulation and analysis functions.
+This material presents how to perform analysis of RNA sequencing data following the tidy data paradigm [@wickham2014tidy]. The tidy data paradigm provides a standard way to organise data values within a dataset, where each variable is a column, each observation is a row, and data is manipulated using an easy-to-understand vocabulary. Most importantly, the data structure remains consistent across manipulation and analysis functions.
 
 This can be achieved for RNA sequencing data with the [tidybulk](https://stemangiola.github.io/tidybulk/), [tidyHeatmap](https://stemangiola.github.io/tidyHeatmap) [@mangiola2020tidyheatmap] and [tidyverse](https://www.tidyverse.org/) [@wickham2019welcome] packages. The tidybulk package provides a tidy data structure and a modular framework for bulk transcriptional analyses. tidyHeatmap provides a tidy implementation of ComplexHeatmap. These packages are part of the tidytranscriptomics suite that introduces a tidy approach to RNA sequencing data representation and analysis
 
@@ -100,11 +98,9 @@ custom_theme <-
   )
 ```
 
-### Setting up the data
+## Setting up the data
 
 Here we will perform RNA-Seq analysis using data from a breast cancer research study, from the paper by [Fu et al. 2015](https://www.ncbi.nlm.nih.gov/pubmed/25730472), GEO code GSE60450. This study examined gene expression in basal and luminal cells from mice at different stages of mammary gland development (virgin, pregnant and lactating). There are 2 samples per group and 6 groups, 12 samples in total.
-
-We will be using the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it reduces the amount of code we need to write when we have multiple steps (as we'll see later). It also can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
 
 ```{r}
 # import RNA-seq counts
@@ -120,38 +116,25 @@ Take a look at the data.
 seqdata
 ```
 
-```{r}
-sampleinfo
-```
+In the `seqdata` object, the first column contains the Entrez gene identifier, the second column contains the gene length and the rest of the columns contain the gene transcription abundance for each sample. The abundance is the number of reads aligning to the gene in each experimental sample. 
 
-Shorten the sample names to the first 7 characters in the counts file columns.
+We can shorten the sample names to just the relevant information, the first 7 characters.
 
 ```{r}
 countdata <- rename_with(seqdata, ~ str_sub(.x, 1, 7), starts_with("MCL"))
 ```
 
-Add gene symbols
+Now let's take a look at the samp-le information table.
 
 ```{r}
-countdata <- mutate(countdata, symbol = AnnotationDbi::mapIds(org.Mm.eg.db::org.Mm.eg.db, 
-                                          keys = as.character(EntrezGeneID), 
-                                          keytype = "ENTREZID", 
-                                          column="SYMBOL", 
-                                          multiVals = "first"))
+sampleinfo
 ```
 
+The CellType column tells us whether the samples are from basal or luminal cells and the Status column tells us what stage of mouse mammary gland development they are from.
 
-Convert the counts into long format (tidy format).
+We'll create a column containing the groups we'll be examining e.g. basal.pregnant and basal.lactate by joining the CellType and Status columns using `unite`. We'll use `mutate` to edit the sample id so we can join to the counts.
 
-```{r}
-counts_long <- 
-	pivot_longer(countdata, cols = starts_with("MCL"), names_to = "sample", values_to = "counts") 
-
-# take a look
-counts_long
-```
-
-
+Here we make use of the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it can reduce the amount of code we need to type and the number of temporary variables we have to create. It also can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
 
 ```{r}
 sampleinfo_formatted <- sampleinfo %>%
@@ -161,51 +144,61 @@ sampleinfo_formatted <- sampleinfo %>%
     
     # replace the . in the SampleName column with - so can join to counts
     mutate(SampleName=str_replace(SampleName, "\\.", "-"))
+
+# take a look
+sampleinfo_formatted 
 ```
 
-Join the counts and sampleinfo 
+To the counts table we can add gene symbols.
+
+```{r}
+countdata <- 
+    # convert ids from numeric to character (text) datatype
+    mutate(EntrezGeneID = as.character(EntrezGeneID)) %>%
+    
+    # add gene symbols
+    mutate(symbol = AnnotationDbi::mapIds(org.Mm.eg.db::org.Mm.eg.db, 
+                                          keys = as.character(EntrezGeneID), 
+                                          keytype = "ENTREZID", 
+                                          column="SYMBOL", 
+                                          multiVals = "first"))
+# take a look
+countdata
+```
+
+We then convert the counts into long format (tidy format) so we can join to the sample information and also use with ggplot and other tidyverse functions.
+
+```{r}
+counts_long <- pivot_longer(countdata, cols = starts_with("MCL"), names_to = "sample", values_to = "counts")
+
+# take a look
+counts_long
+```
+
+We join the counts and sample information into one table.
+
 ```{r}
 counts_annot <- left_join(counts_long, sampleinfo_formatted, by = c("sample" = "SampleName"))
+
+# take a look
+counts_annot 
 ```
+
+To perform the RNA sequencing analysis steps, we convert into a tidybulk tibble. A tibble is the tidyverse table format.
 
 ```{r}
-# convert to tidybulk tibble
-counts_tt <-
-  counts_annot %>%
-  mutate(EntrezGeneID = as.character(EntrezGeneID)) %>%
-  tidybulk(.sample=sample, .transcript=EntrezGeneID, .abundance=counts)
-```
+counts_tt <- tidybulk(counts_annot, .sample=sample, .transcript=EntrezGeneID, .abundance=counts)
 
-
-The `counts_airway` object contains information about genes and samples, the first column has the Ensembl gene identifier, the second column has the sample identifier and the third column has the gene transcription abundance. The abundance is the number of reads aligning to the gene in each experimental sample. The remaining columns include sample-wise information. The dex column tells us whether the samples are treated or untreated and the cell column tells us what cell line they are from.
-We can shorten the sample names. We can remove the SRR1039 prefix that's present in all of them, as shorter names can fit better in some of the plots we will create. We can use `mutate()` together with `str_replace()` to remove the SRR1039 string from the sample column.
-We can get the gene symbols for these Ensembl gene ids using the Bioconductor annotation package for human, `org.Hs.eg.db` and add them as a column using `mutate` again.
-With tidyverse, all above steps can be linked with the `%>%`, as shown below. This has the benefits that
-* no temporary variables need to be created
-* less typing is required
-* the steps can be seen more clearly.
-```{r eval=FALSE}
-# setup data workflow
-counts_tt <-
-  airway %>%
-  tidybulk() %>%
-  mutate(sample = str_remove(sample, "SRR1039")) %>%
-  mutate(symbol = AnnotationDbi::mapIds(org.Hs.eg.db::org.Hs.eg.db,
-    keys = as.character(feature),
-    keytype = "ENSEMBL",
-    column = "SYMBOL",
-    multiVals = "first"
-  ))
 # take a look
 counts_tt
 ```
 
-From this tidybulk tibble, we can perform differential expression analysis with the tidybulk package.
+Using this tidybulk tibble we can perform differential expression analysis with the tidybulk package.
 
 ## Filtering lowly transcribed genes  
 Genes with very low counts across all libraries provide little evidence for differential expression and they can interfere with some of the statistical approximations that are used later in the pipeline. They also add to the multiple testing burden when estimating false discovery rates, reducing power to detect differentially expressed genes. These genes should be filtered out prior to further analysis.
 
-We can perform the filtering using tidybulk `keep_abundant` or `identify_abundant`. These functions can use the *edgeR* `filterByExpr` function described in [@law2016rna] to automatically identify the genes with adequate abundance for differential expression testing. By default, this will keep genes with ~10 counts in a minimum number of samples, the number of the samples in the smallest group. In this dataset the smallest group size is four (as we have four dex-treated samples versus four untreated). Alternatively, we could use `identify_abundant` to identify which genes are abundant or not (TRUE/FALSE), rather than just keeping the abundant ones. 
+We can perform the filtering using tidybulk `keep_abundant` or `identify_abundant`. These functions can use the *edgeR* `filterByExpr` function described in [@law2016rna] to automatically identify the genes with adequate abundance for differential expression testing. By default, this will keep genes with ~10 counts in a minimum number of samples, the number of the samples in the smallest group. In this dataset the smallest group size is two (we have two replicates for each group). Alternatively, we could use `identify_abundant` to identify which genes are abundant or not (TRUE/FALSE), rather than just keeping the abundant ones. 
 
 ```{r}
 # Filtering counts
@@ -244,7 +237,8 @@ counts_scaled %>%
   geom_hline(aes(yintercept = median(abundance + 1)), colour = "red") +
   facet_wrap(~source) +
   scale_y_log10() +
-  theme_bw()
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90))
 ```
 
 In this dataset the distributions of the counts are not very different to each other before scaling but scaling does make the distributions more similar. If we saw a sample with a very different distribution we may need to investigate it.
@@ -290,9 +284,6 @@ counts_scal_MDS %>%
   custom_theme
 ```
 
-The samples separate by treatment on PC1 which is what we hope to see. PC2 separates the N080611 cell line from the other samples, indicating a greater difference between that cell line and the others.
-
-
 ### Hierarchical clustering with heatmaps
 
 An alternative to principal component analysis for examining relationships between samples is using hierarchical clustering. Heatmaps are a nice visualisation to examine hierarchical clustering of your samples. tidybulk has a simple function we can use, `keep_variable`, to extract the most variable genes which we can then plot with tidyHeatmap.
@@ -314,35 +305,12 @@ counts_scal_MDS %>%
   add_tile(Status)
 ```
 
-In the heatmap we can see the samples cluster into two groups, treated and untreated, for three of the cell lines, and the cell line (N080611) again is further away from the others.
-
-Tidybulk enables a simplified way of generating a clustered heatmap of variable genes. Compare the code below for tidybulk versus a base R method.
-
-**base R using edgeR**
-```{r eval=FALSE}
-# Example code, no need to run
-
-library(edgeR)
-dgList <- SE2DGEList(airway)
-group <- factor(dgList$samples$dex)
-keep.exprs <- filterByExpr(dgList, group = group)
-dgList <- dgList[keep.exprs, , keep.lib.sizes = FALSE]
-dgList <- calcNormFactors(dgList)
-logcounts <- cpm(dgList, log = TRUE)
-var_genes <- apply(logcounts, 1, var)
-select_var <- names(sort(var_genes, decreasing = TRUE))[1:500]
-highly_variable_lcpm <- logcounts[select_var, ]
-colours <- c("#440154FF", "#21908CFF", "#fefada")
-col.group <- c("red", "grey")[group]
-gplots::heatmap.2(highly_variable_lcpm, col = colours, trace = "none", ColSideColors = col.group, scale = "row")
-```
-
 
 ## Differential expression
 
 *tidybulk* integrates several popular methods for differential transcript abundance testing: the edgeR quasi-likelihood [@chen2016reads] (tidybulk default method), edgeR likelihood ratio [@mccarthy2012differential], limma-voom [@law2014voom] and DESeq2 [@love2014moderated]. A common question researchers have is which method to choose. With tidybulk we can easily run multiple methods and compare.
 
-We give `test_differential_abundance` our tidybulk counts object and a formula, specifying the column that contains our groups to be compared. If all our samples were from the same cell line, and there were no additional factors contributing variance such as batch differences, we could use the formula `~ dex`. However, each treated and untreated sample is from a different cell line so we add the cell line as an additional factor `~ dex + cell`. 
+We give `test_differential_abundance` our tidybulk counts object and a formula, specifying the column that contains our groups to be compared. 
 
 ```{r message=FALSE}
 de_all <-
@@ -392,119 +360,6 @@ de_all
 
 This outputs the columns from each method such as log-fold change (logFC), false-discovery rate (FDR) and probability value (p-value). logFC is log2(treated/untreated).
 
-### Comparison of methods
-
-We can visually compare the significance for all methods. We will notice that there is some difference between the methods.
-
-```{r message=FALSE}
-de_all %>%
-  pivot_transcript() %>%
-  select(edgerQLT_PValue, edgerLR_PValue, voom_P.Value, deseq2_pvalue, EntrezGeneID) %>%
-  ggpairs(1:4)
-```
-
-In order to decide which genes are differentially expressed, we usually take a cut-off of 0.05 on the FDR (or adjusted P value), NOT the raw p-value. This is because we are testing many genes (multiple testing), and the chances of finding differentially expressed genes is very high when you do that many tests. Hence we need to control the false discovery rate, which is the adjusted p-value column in the results table. What this means is that if 100 genes are significant at a 5% false discovery rate, we are willing to accept that 5 will be false positives. 
-
-We can count how many differentially expressed genes there are, for example with the edgeR QLT method. We'll filter on FDR 0.05.
-
-```{r}
-de_all %>%
-  filter(edgerQLT_FDR < 0.05) %>%
-  summarise(num_de = n_distinct(EntrezGeneID))
-```
-
-
-```{poll_7 class.source="poll"}
-Which method detects the most differentially abundant transcripts, p value adjusted for multiple testing <  0.05 (FDR, adj.P.Val, padj)?
-```
-
-_Note: Some of the methods produce columns with different names for similar outputs. If you wish to make these consistent you can do that with tidyverse `rename`. For example, to rename the p value adjusted columns you could run below._
-
-```{r eval=FALSE}
-de_all %>% rename(deseq2_FDR = deseq2_padj, voom_FDR = voom_adj.P.Val)
-```
-
-We can select some of the transcripts that look different between methods in the plot using the [*tidygate*](https://github.com/stemangiola/tidygate) package. We can then investigate these transcripts, for example, by visualising their counts.
-
-With tidygate, we can interactively draw gates to select points we want using `gate`. We specify which columns we want to plot in the scatterplot, and how many gates we want to draw. We can also specify the opacity if we want to make it easier to see overlapping points.
-
-```{r, eval=FALSE}
-de_gate <-
-  de_all %>%
-
-  tidygate::gate(
-    EntrezGeneID,
-    edgerQLT_PValue,
-    deseq2_pvalue,
-    opacity = 0.3,
-    how_many_gates = 2
-  )
-```
-
-We then click to draw gates around the points we want, for example as shown in the screenshot below.
-
-```{r, echo=FALSE}
-knitr::include_graphics("../inst/vignettes/comparison_different_DE_methods_gates.png")
-```
-
-That will add a column called gate, specifying which gate the points (transcripts) are in.
-
-```{r echo=FALSE}
-# using pre-selected gates just to render the html version of this document
-de_gate <-
-  de_all %>%
-
-  tidygate::gate(
-    EntrezGeneID,
-    edgerQLT_PValue,
-    deseq2_pvalue,
-    gate_list = RNAseqRtidyverse::de_gate_gates
-  )
-
-de_gate
-```
-
-We can check how many transcripts we've got in each gate.
-
-```{r}
-de_gate %>%
-  pivot_transcript() %>%
-  count(gate)
-```
-
-We can now select the transcripts from our two gates i.e. more significant in edgeR (gate 1) and more significant in DESeq2 (gate 2) and visualise the counts for each sample in the treated and untreated groups.
-
-```{r eval=FALSE}
-de_gate %>%
-
-  # Filter for transcripts within the gates
-  filter(gate > 0) %>%
-
-  # Rename for clarity
-  mutate(gate = case_when(
-    gate == 1 ~ "more in edgeR",
-    gate == 2 ~ "more in DESeq2",
-    TRUE ~ gate
-  )) %>%
-
-  # Order the plots for the transcripts
-  mutate(EntrezGeneID = forcats::fct_reorder(EntrezGeneID, edgerQLT_PValue, min)) %>%
-
-  # Plot
-  ggplot(aes(dex, counts_scaled, color = gate)) +
-  geom_point() +
-  facet_wrap(~EntrezGeneID, scale = "free_y", ncol = 4) +
-  custom_theme
-```
-
-We could also check the log fold changes for these genes and see, for example, that DESeq2 produces a more conservative logFC statistic for the gene `ENSG00000104725`.
-
-```{r eval=FALSE}
-de_gate %>%
-  pivot_transcript() %>%
-  filter(EntrezGeneID == "ENSG00000104725") %>%
-  select(edgerQLT_logFC, deseq2_log2FoldChange)
-```
 
 ### Single method
 
@@ -515,25 +370,6 @@ counts_de <- counts_scal_MDS %>%
     test_differential_abundance(~ 0 + Group,
                                 .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate"),
                                 omit_contrast_in_colnames = TRUE)
-```
-
-Tidybulk enables a simplified way of performing an RNA sequencing differential expression analysis (with the benefit of smoothly integrating with ggplot2 and other tidyverse packages). Compare the code for a tidybulk edgeR analysis versus standard edgeR below.
-
-**standard edgeR**
-```{r eval=FALSE}
-# Example code, no need to run
-
-library(edgeR)
-dgList <- SE2DGEList(airway)
-group <- factor(dgList$samples$dex)
-keep.exprs <- filterByExpr(dgList, group = group)
-dgList <- dgList[keep.exprs, , keep.lib.sizes = FALSE]
-dgList <- calcNormFactors(dgList)
-cell <- factor(dgList$samples$cell)
-design <- model.matrix(~ group + cell)
-dgList <- estimateDisp(dgList, design)
-fit <- glmQLFit(dgList, design)
-qlf <- glmQLFTest(fit, coef=2)
 ```
 
 
