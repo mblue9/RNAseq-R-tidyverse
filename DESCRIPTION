@@ -19,7 +19,6 @@ Depends:
     R (>= 4.0.0)
 Imports:
     tidybulk,
-    tidygate,
     tidyHeatmap,
     stats,
     utils,
@@ -29,17 +28,14 @@ Imports:
     dplyr,
     readr,
     tidyr,
-    forcats,
+    stringr,
     limma,
     edgeR,
-    DESeq2,
     ggrepel,
     org.Mm.eg.db,
     AnnotationDbi,
     dittoSeq,
-    GGally,
-    plotly,
-    acepack,
+    plotly
 Suggests:
     knitr,
     rmarkdown,

@@ -65,17 +65,21 @@ Recommended Background Reading
 
 ### _R_ / _Bioconductor_ packages used
 
-* tidyverse
-* tidybulk
-* tidyHeatmap
-* tidygate
-* limma
-* edgeR
-* DESeq2
-* org.Mm.eg.db
-* dittoSeq
-* ggrepel
-* GGally
+* tidybulk,
+* tidyHeatmap,
+* tibble,
+* stringr,
+* ggplot2,
+* dplyr,
+* readr,
+* tidyr,
+* stringr,
+* limma,
+* edgeR,
+* ggrepel,
+* org.Mm.eg.db,
+* AnnotationDbi,
+* dittoSeq,
 * plotly
 
 ### Material goals and objectives
