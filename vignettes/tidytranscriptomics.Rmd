@@ -42,7 +42,7 @@ knitr::include_graphics("../inst/vignettes/tidybulk_logo.png")
 ```
 
 
-## Introduction
+## Introduction and data import
 Measuring gene expression on a genome-wide scale has become common practice over the last two decades or so, with microarrays predominantly used pre-2008. With the advent of next generation sequencing technology in 2008, an increasing number of scientists use this technology to measure and understand changes in gene expression in often complex systems. As sequencing costs have decreased, using RNA sequencing to simultaneously measure the expression of tens of thousands of genes for multiple samples has never been easier. The cost of these experiments has now moved from generating the data to storing and analysing it.
 
 There are many steps involved in analysing an RNA sequencing dataset. Sequenced reads are aligned to a reference genome, then the number of reads mapped to each gene can be counted. This results in a table of counts, which is what we perform statistical analyses on in R. While mapping and counting are important and necessary tasks, today we will be starting from the count data and showing how differential expression analysis can be performed in a friendly way using the Bioconductor package, tidybulk.
@@ -97,9 +97,11 @@ custom_theme <-
   )
 ```
 
-## Setting up the data
+## Mouse mammary gland dataset
 
 Here we will perform RNA-Seq analysis using data from a breast cancer research study, from the paper by [Fu et al. 2015](https://www.ncbi.nlm.nih.gov/pubmed/25730472), GEO code GSE60450. This study examined gene expression in basal and luminal cells from mice at different stages of mammary gland development (virgin, pregnant and lactating). There are 2 samples per group and 6 groups, 12 samples in total.
+
+## Reading in the data
 
 ```{r}
 # import RNA-seq counts
@@ -117,10 +119,26 @@ seqdata
 
 In the `seqdata` object, the first column contains the Entrez gene identifier, the second column contains the gene length and the rest of the columns contain the gene transcription abundance for each sample. The abundance is the number of reads aligning to the gene in each experimental sample. 
 
+## Format the data
+
+We first convert the counts into long format (tidy format) so we can join to the sample information and also use with ggplot and other tidyverse functions.
+
+In this workshop we make use of the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
+
+```{r}
+counts_long <- seqdata %>% pivot_longer(cols = starts_with("MCL"), names_to = "sample", values_to = "counts")
+
+# take a look
+counts_long
+```
+
 We can shorten the sample names to just the relevant information, the first 7 characters.
 
 ```{r}
-countdata <- rename_with(seqdata, ~ str_sub(.x, 1, 7), starts_with("MCL"))
+counts_formatted <- counts_long %>% mutate(sample_name=str_extract(sample, "MCL1-.."))
+
+# take a look
+counts_formatted
 ```
 
 Now let's take a look at the sample information table.
@@ -133,7 +151,6 @@ The CellType column tells us whether the samples are from basal or luminal cells
 
 We'll create a column containing the groups we'll be examining e.g. basal.pregnant and basal.lactate by joining the CellType and Status columns using `unite`. We'll use `mutate` to edit the sample id so we can join to the counts.
 
-Here we make use of the tidyverse pipe `%>%`. This 'pipes' the output from the command on the left into the command on the right/below. Using the pipe is not essential but it can make the steps clearer and easier to see. For more details on the pipe see [here](https://r4ds.had.co.nz/pipes.html).
 
 ```{r}
 sampleinfo_formatted <- sampleinfo %>%
@@ -141,52 +158,49 @@ sampleinfo_formatted <- sampleinfo %>%
     # make column called Group by combining the CellType and Status columns
     unite("Group", CellType:Status, sep=".", remove=FALSE) %>%
     
-    # replace the . in the SampleName column with - so can join to counts
-    mutate(SampleName=str_replace(SampleName, "\\.", "-"))
+    # replace the . in the SampleName with - so can join to counts
+    mutate(sample_name=str_replace(SampleName, "\\.", "-"))
 
 # take a look
 sampleinfo_formatted 
 ```
 
+## Adding annotation
+
 To the counts table we can add gene symbols.
 
 ```{r}
-countdata <- countdata %>%
-    # convert ids from numeric to character (text) datatype
-    mutate(EntrezGeneID = as.character(EntrezGeneID)) %>%
+counts_annotated <- counts_formatted %>%
     
-    # add gene symbols
     mutate(symbol = AnnotationDbi::mapIds(org.Mm.eg.db::org.Mm.eg.db, 
                                           keys = as.character(EntrezGeneID), 
                                           keytype = "ENTREZID", 
                                           column="SYMBOL", 
                                           multiVals = "first"))
 # take a look
-countdata
+counts_annotated
 ```
 
-We then convert the counts into long format (tidy format) so we can join to the sample information and also use with ggplot and other tidyverse functions.
-
-```{r}
-counts_long <- pivot_longer(countdata, cols = starts_with("MCL"), names_to = "sample", values_to = "counts")
-
-# take a look
-counts_long
-```
 
 We join the counts and sample information into one table.
 
 ```{r}
-counts_annot <- left_join(counts_long, sampleinfo_formatted, by = c("sample" = "SampleName"))
+counts <- left_join(counts_annotated, sampleinfo_formatted, by = "sample_name")
 
 # take a look
-counts_annot 
+counts
 ```
+
+## Convert counts to tidybulk tibble
 
 To perform the RNA sequencing analysis steps, we convert into a tidybulk tibble. A tibble is the tidyverse table format.
 
 ```{r}
-counts_tt <- tidybulk(counts_annot, .sample=sample, .transcript=EntrezGeneID, .abundance=counts)
+counts_tt <- counts %>% 
+    # convert ids from numeric to character (text) datatype
+    mutate(EntrezGeneID = as.character(EntrezGeneID)) %>%
+    
+    tidybulk(.sample=sample_name, .transcript=EntrezGeneID, .abundance=counts)
 
 # take a look
 counts_tt
@@ -194,7 +208,8 @@ counts_tt
 
 Using this tidybulk tibble we can perform differential expression analysis with the tidybulk package.
 
-## Filtering lowly transcribed genes  
+## Filtering lowly expressed genes  
+
 Genes with very low counts across all libraries provide little evidence for differential expression and they can interfere with some of the statistical approximations that are used later in the pipeline. They also add to the multiple testing burden when estimating false discovery rates, reducing power to detect differentially expressed genes. These genes should be filtered out prior to further analysis.
 
 We can perform the filtering using tidybulk `keep_abundant` or `identify_abundant`. These functions can use the *edgeR* `filterByExpr` function described in [@law2016rna] to automatically identify the genes with adequate abundance for differential expression testing. By default, this will keep genes with ~10 counts in a minimum number of samples, the number of the samples in the smallest group. In this dataset the smallest group size is two (we have two replicates for each group). Alternatively, we could use `identify_abundant` to identify which genes are abundant or not (TRUE/FALSE), rather than just keeping the abundant ones. 
@@ -207,6 +222,29 @@ counts_filtered <- counts_tt %>% keep_abundant(factor_of_interest = Group)
 counts_filtered
 ```
 After running `keep_abundant` we have a column called `.abundant` containing TRUE  (`identify_abundant` would have TRUE/FALSE).
+
+# Quality control
+
+Now that we have got rid of the lowly expressed genes, we can look at a few different plots to check that the data is good quality, and that the samples are as we would expect.
+
+## Library size and distribution plots
+
+First, we can check how many reads we have for each sample.
+
+```{r}
+counts_tt %>%
+  group_by(sample_name) %>%
+  summarise(total_reads = sum(counts))
+```
+
+We can also plot the library sizes as a barplot to see whether there are any major discrepancies between the samples more easily.
+
+```{r}
+ggplot(counts_tt, aes(x = sample_name, weight = counts, fill = sample_name)) +
+  geom_bar() +
+  theme_bw()
+```
+
 
 ## Scaling counts to normalise
 
@@ -231,7 +269,7 @@ counts_scaled %>%
   pivot_longer(cols = c("counts", "counts_scaled"), names_to = "source", values_to = "abundance") %>%
     
   # Plotting
-  ggplot(aes(x = sample, y = abundance + 1, fill = Group)) +
+  ggplot(aes(x = sample_name, y = abundance + 1, fill = Group)) +
   geom_boxplot() +
   geom_hline(aes(yintercept = median(abundance + 1)), colour = "red") +
   facet_wrap(~source) +
@@ -279,7 +317,7 @@ counts_scal_MDS %>%
   pivot_sample() %>%
   ggplot(aes(x = Dim1, y = Dim2, colour = CellType, shape = Status)) +
   geom_point() +
-  geom_text_repel(aes(label = sample), show.legend = FALSE) +
+  geom_text_repel(aes(label = sample_name), show.legend = FALSE) +
   custom_theme
 ```
 
@@ -296,7 +334,7 @@ counts_scal_MDS %>%
 
   # create heatmap
   heatmap(
-    .column = sample,
+    .column = sample_name,
     .row = EntrezGeneID,
     .value = counts_scaled,
     transform = log1p
@@ -321,6 +359,14 @@ counts_de <- counts_scal_MDS %>%
 ```
 This outputs the columns from each method such as log-fold change (logFC), false-discovery rate (adj.P.Val) and probability value (P.Value). logFC is log2(basal.pregnant/basal.lactate).
 
+## Writing out the results
+
+```{r eval=FALSE}
+counts_de %>%
+    pivot_transcript %>%
+    write_tsv("de_results.tsv")
+```
+
 ## Plots after testing for differentially expressed
 
 We'll extract the symbols for a few top genes (by P value) to use in some of the plots we will make.
@@ -329,9 +375,38 @@ We'll extract the symbols for a few top genes (by P value) to use in some of the
 topgenes_symbols <-
   counts_de %>%
   pivot_transcript() %>%
-  arrange(P.Value) %>%
-  head(6) %>%
+  slice_min(P.Value, n=6) %>%
   pull(symbol)
+```
+
+### MA plots
+
+```{r}
+# maplot, minimal
+counts_de %>%
+  pivot_transcript() %>%
+  ggplot(aes(x = logCPM, y = -logFC, colour = FDR < 0.05)) +
+  geom_point() +
+  theme_bw()
+```
+
+A more informative MA plot, integrating some of the packages in tidyverse.
+
+```{r}
+counts_de %>%
+  pivot_transcript() %>%
+
+  # Subset data
+  mutate(significant = FDR < 0.05 & abs(logFC) >= 2) %>%
+  mutate(transcript = ifelse(abs(logFC) >= 5, as.character(transcript), "")) %>%
+
+  # Plot
+  ggplot(aes(x = logCPM, y = logFC, label = transcript)) +
+  geom_point(aes(color = significant, size = significant, alpha = significant)) +
+  geom_text_repel() +
+  scale_color_manual(values = c("black", "#e11f28")) +
+  scale_size_discrete(range = c(0, 2)) +
+  theme_bw()
 ```
 
 ### Volcano plots
@@ -383,8 +458,7 @@ strip_chart <-
   filter(symbol %in% topgenes_symbols) %>%
 
   # make faceted stripchart
-  ggplot(aes(x = Group, y = counts_scaled + 1, fill = Group, label = sample)) +
-  geom_boxplot() +
+  ggplot(aes(x = Group, y = counts_scaled + 1, fill = Group, label = sample_name)) +
   geom_jitter() +
   facet_wrap(~symbol) +
   scale_y_log10() +
@@ -405,6 +479,23 @@ strip_chart %>% ggplotly(tooltip = c("label", "y"))
 ```
 
 
+## Gene Set Testing
+
+```{r}
+counts_scal_MDS %>%
+rename(transcript=EntrezGeneID) %>%
+test_gene_enrichment(
+                     .formula=~ 0 + Group,
+                     .sample=sample_name,
+                     .abundance=counts,
+                     .entrez=transcript,
+                     .transcript=transcript,
+                     .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate"),
+                     species="mouse",
+                     method = c("camera", "ora", "padog"))
+```
+
+
 ## Automatic bibliography
 
 Tidybulk provides a handy function called `get_bibliography` that keeps track of the references for the methods used in your tidybulk workflow. The references are in BibTeX format and can be imported into your reference manager.
@@ -415,7 +506,7 @@ get_bibliography(counts_de)
 
 
 # Contributing
-If you want to suggest improvements for this workshop or ask questions, you can do so as described [here](https://github.com/mblue9/RNAseq-R-tidyverse/blob/master/CONTRIBUTING.md).
+If you want to suggest improvements for this material or ask questions, you can do so as described [here](https://github.com/mblue9/RNAseq-R-tidyverse/blob/master/CONTRIBUTING.md).
 
 # Reproducibility
 Record package and version information with `sessionInfo`

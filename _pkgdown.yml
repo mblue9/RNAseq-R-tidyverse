@@ -17,8 +17,8 @@ navbar:
       href: articles/tidytranscriptomics.html
 
   right:
-   - icon: fa-github
+   - icon: fab fa-github
      href: https://github.com/mblue9/RNAseq-R-tidyverse
-   - icon: fa-docker
+   - icon: fab fa-docker
      href: https://hub.docker.com/repository/docker/mblue9/RNAseq-R-tidyverse
     
