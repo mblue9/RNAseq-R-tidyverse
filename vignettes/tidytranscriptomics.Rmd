@@ -20,15 +20,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{css, echo = FALSE}
-# Formatting for polls
-.poll {
-background-color: #fff4d4;
-}
-.poll code {
-	background-color: #fff4d4;
-}
-```
+
 This material presents how to perform analysis of RNA sequencing data following the tidy data paradigm [@wickham2014tidy]. The tidy data paradigm provides a standard way to organise data values within a dataset, where each variable is a column, each observation is a row, and data is manipulated using an easy-to-understand vocabulary. Most importantly, the data structure remains consistent across manipulation and analysis functions.
 
 This can be achieved for RNA sequencing data with the [tidybulk](https://stemangiola.github.io/tidybulk/)[@Mangiola2021], [tidyHeatmap](https://stemangiola.github.io/tidyHeatmap) [@mangiola2020tidyheatmap] and [tidyverse](https://www.tidyverse.org/) [@wickham2019welcome] packages. The tidybulk package provides a tidy data structure and a modular framework for bulk transcriptional analyses. tidyHeatmap provides a tidy implementation of ComplexHeatmap. These packages are part of the tidytranscriptomics suite that introduces a tidy approach to RNA sequencing data representation and analysis
@@ -221,6 +213,10 @@ counts_filtered <- counts_tt %>% keep_abundant(factor_of_interest = Group)
 # take a look
 counts_filtered
 ```
+```{r}
+# take a look
+rmarkdown::paged_table(counts_filtered)
+```
 After running `keep_abundant` we have a column called `.abundant` containing TRUE  (`identify_abundant` would have TRUE/FALSE).
 
 # Quality control
@@ -385,7 +381,7 @@ topgenes_symbols <-
 # maplot, minimal
 counts_de %>%
   pivot_transcript() %>%
-  ggplot(aes(x = logCPM, y = -logFC, colour = FDR < 0.05)) +
+  ggplot(aes(x = AveExpr, y = logFC, colour = adj.P.Val < 0.05)) +
   geom_point() +
   theme_bw()
 ```
@@ -397,11 +393,11 @@ counts_de %>%
   pivot_transcript() %>%
 
   # Subset data
-  mutate(significant = FDR < 0.05 & abs(logFC) >= 2) %>%
-  mutate(transcript = ifelse(abs(logFC) >= 5, as.character(transcript), "")) %>%
+  mutate(significant = adj.P.Val < 0.05 & abs(logFC) >= 2) %>%
+  mutate(transcript = ifelse(abs(logFC) >= 6, symbol, "")) %>%
 
   # Plot
-  ggplot(aes(x = logCPM, y = logFC, label = transcript)) +
+  ggplot(aes(x = AveExpr, y = logFC, label = transcript)) +
   geom_point(aes(color = significant, size = significant, alpha = significant)) +
   geom_text_repel() +
   scale_color_manual(values = c("black", "#e11f28")) +
@@ -458,11 +454,16 @@ strip_chart <-
   filter(symbol %in% topgenes_symbols) %>%
 
   # make faceted stripchart
-  ggplot(aes(x = Group, y = counts_scaled + 1, fill = Group, label = sample_name)) +
+  ggplot(aes(x = Group, y = counts_scaled + 1, colour = Group, label = sample_name)) +
   geom_jitter() +
   facet_wrap(~symbol) +
   scale_y_log10() +
-  custom_theme
+  custom_theme +
+  # some plot customisations
+  xlab("") +    
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))
+    
 
 strip_chart
 ```
@@ -477,24 +478,13 @@ We can also specify which parameters from the `aes` we want to show up when we h
 ```{r, out.width = "70%", warning=FALSE}
 strip_chart %>% ggplotly(tooltip = c("label", "y"))
 ```
+## Testing relative to a threshold (TREAT)
 
+TO DO
 
 ## Gene Set Testing
 
-```{r}
-counts_scal_MDS %>%
-rename(transcript=EntrezGeneID) %>%
-test_gene_enrichment(
-                     .formula=~ 0 + Group,
-                     .sample=sample_name,
-                     .abundance=counts,
-                     .entrez=transcript,
-                     .transcript=transcript,
-                     .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate"),
-                     species="mouse",
-                     method = c("camera", "ora", "padog"))
-```
-
+TO DO
 
 ## Automatic bibliography
 
