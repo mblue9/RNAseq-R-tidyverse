@@ -16,7 +16,7 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Depends:
-    R (>= 4.0.0)
+    R (>= 4.1.0)
 Imports:
     tidybulk,
     tidyHeatmap,
@@ -35,7 +35,8 @@ Imports:
     org.Mm.eg.db,
     AnnotationDbi,
     dittoSeq,
-    plotly
+    plotly,
+    EGSEA
 Suggests:
     knitr,
     rmarkdown,

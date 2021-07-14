@@ -5,7 +5,6 @@ author:
   - Stefano Mangiola, Walter and Eliza Hall Institute^[<mangiola.s at wehi.edu.au>]
 date: "`r format(Sys.time(), '%d %B %Y')`" 
 output: rmarkdown::html_vignette
-bibliography: "`r file.path(system.file(package='RNAseqRtidyverse', 'vignettes'), 'tidytranscriptomics.bib')`"
 vignette: >
   %\VignetteIndexEntry{RNAseq-R-tidyverse}
   %\VignetteEngine{knitr::rmarkdown}
@@ -47,17 +46,15 @@ _Note: you should load the *tidybulk* library after the tidyverse core packages 
 ```{r message=FALSE, warning=FALSE}
 # load libraries
 
-# tidyverse core packages
 library(tibble)
 library(dplyr)
 library(tidyr)
 library(readr)
 library(stringr)
 library(ggplot2)
-
-# tidyverse-friendly packages
 library(plotly)
 library(ggrepel)
+library(EGSEA)
 library(tidyHeatmap)
 library(tidybulk)
 ```
@@ -215,7 +212,7 @@ counts_filtered
 ```
 ```{r}
 # take a look
-rmarkdown::paged_table(counts_filtered)
+counts_filtered
 ```
 After running `keep_abundant` we have a column called `.abundant` containing TRUE  (`identify_abundant` would have TRUE/FALSE).
 
@@ -355,6 +352,23 @@ counts_de <- counts_scal_MDS %>%
 ```
 This outputs the columns from each method such as log-fold change (logFC), false-discovery rate (adj.P.Val) and probability value (P.Value). logFC is log2(basal.pregnant/basal.lactate).
 
+We can count the number of differentially expressed genes.
+
+```{r}
+counts_de %>% 
+    pivot_transcript() %>%
+    mutate(signif=adj.P.Val<0.05) %>%
+    summarise(Up=sum(signif & logFC>0), 
+              Down=sum(signif & logFC<0),
+              NotSig=sum(!signif))
+```
+```{r}
+counts_de_two_contrasts <- counts_scal_MDS %>%
+    test_differential_abundance(~ 0 + Group,
+                                 method = "limma_voom",
+                                .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate", "Groupluminal.pregnant - Groupluminal.lactate"))
+```
+
 ## Writing out the results
 
 ```{r eval=FALSE}
@@ -378,15 +392,22 @@ topgenes_symbols <-
 ### MA plots
 
 ```{r}
-# maplot, minimal
 counts_de %>%
   pivot_transcript() %>%
-  ggplot(aes(x = AveExpr, y = logFC, colour = adj.P.Val < 0.05)) +
+  
+  # Specify significant genes    
+  mutate(signif=ifelse((adj.P.Val < 0.05 & logFC > 1), "Up",
+                ifelse((adj.P.Val < 0.05 & logFC < -1), "Down", 
+                "NotSig"))) %>%
+  # Specify genes to label
+  mutate(symbol = ifelse(symbol %in% topgenes_symbols, symbol, "")) %>%
+    
+  ggplot(aes(x = AveExpr, y = logFC, colour=signif, label=symbol)) +
   geom_point() +
+  scale_colour_manual(values=c("Up"="red", "Down"="blue", "NotSig"="grey")) +
+  geom_text_repel(colour="black", max.overlaps = Inf) +
   theme_bw()
 ```
-
-A more informative MA plot, integrating some of the packages in tidyverse.
 
 ```{r}
 counts_de %>%
@@ -409,16 +430,6 @@ counts_de %>%
 
 Volcano plots are a useful genome-wide plot for checking that the analysis looks good. Volcano plots enable us to visualise the significance of change (p-value) versus the fold change (logFC). Highly significant genes are towards the top of the plot. We can also colour significant genes (e.g. genes with false-discovery rate < 0.05)
 
-```{r out.width = "70%"}
-# volcano plot, minimal
-counts_de %>%
-  ggplot(aes(x = logFC, y = P.Value, colour = adj.P.Val < 0.05)) +
-  geom_point() +
-  scale_y_continuous(trans = "log10_reverse") +
-  custom_theme
-```
-
-A more informative plot, integrating some of the packages in tidyverse.
 
 ```{r out.width = "70%", warning=FALSE}
 counts_de %>%
@@ -478,20 +489,62 @@ We can also specify which parameters from the `aes` we want to show up when we h
 ```{r, out.width = "70%", warning=FALSE}
 strip_chart %>% ggplotly(tooltip = c("label", "y"))
 ```
+
 ## Testing relative to a threshold (TREAT)
 
-TO DO
+When there is a lot of differential expression, sometimes we may want to cut-off on a fold change threshold as well as a p-value threshold so that we follow up on the most biologically significant genes. However, it is not recommended to simply rank by p-value and then discard genes with small logFC’s, as this has been shown to increase the false discovery rate. In other words, you are not controlling the false discovery rate at 5% any more. There is a function called treat that performs this style of analysis correctly [@McCarthy and Smyth 2009]. We simply need to specify a logFC cut-off with `test_differential_abundance` using `test_above_log2_fold_change=` and tidybulk will use treat to calculate the p-values taking into account the information about logFC. We'll use a log2 fold change of 1 which is equivalent to a fold change of 2.
+
+```{r}
+counts_de_treat <- counts_scal_MDS %>%
+    test_differential_abundance(~ 0 + Group,
+                                 method = "limma_voom",
+                                .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate"),
+                                omit_contrast_in_colnames = TRUE,
+                                test_above_log2_fold_change = 1)
+```
+
+If we count the number of differentially expressed genes we can see there are less significant genes now.
+
+```{r}
+counts_de_treat %>% 
+    pivot_transcript() %>%
+    mutate(signif=adj.P.Val<0.05) %>%
+    summarise(Up=sum(signif & logFC>0), 
+              Down=sum(signif & logFC<0),
+              NotSig=sum(!signif))
+```
 
 ## Gene Set Testing
 
-TO DO
+Sometimes there is quite a long list of differentially expressed genes to interpret after a differential expression analysis, and it is usually infeasible to go through the list one gene at a time trying to understand it’s biological function. A common downstream procedure is gene set testing, which aims to understand which pathways/gene networks the differentially expressed genes are implicated in.
+
+With tidybulk we can use `test_gene_enrichment` to perform gene set testing via EGSEA. EGSEA provides a choice of methods that can be used either individually or in combination to generate an ensemble score. Here we will demonstrate CAMERA, which is a good option for testing a very large number of gene sets, such as the MSigDB sets, as it is very fast. CAMERA is known as a competitive gene set test, however it has the advantage that it can take into account inter-gene correlation within each gene set (Wu and Smyth 2012). 
+
+EGSEA also provide collections of gene sets from the Broad Institute’s Molecular Signatures Database (MSigDB) for human, mouse and rat. The c2 gene sets contain >5000 curated gene sets collected from a variety of places: BioCarta, KEGG, Pathway Interaction Database, Reactome as well as some published studies. 
+
+```{r message = FALSE}
+counts_egsea <- counts_scaled %>%
+    test_gene_enrichment(.entrez=EntrezGeneID, 
+                         .abundance=counts_scaled, 
+                         .formula=~ 0 + Group, 
+                         .contrasts =  c("Groupbasal.pregnant - Groupbasal.lactate"), 
+                         species="mouse", 
+                         methods="camera",
+                         gene_sets="c2")
+```
+
+The output is a tibble containing each gene set tested with P values and other information. A HTML report is also produced containing summary plots.
+
+```{r}
+counts_egsea
+```
 
 ## Automatic bibliography
 
 Tidybulk provides a handy function called `get_bibliography` that keeps track of the references for the methods used in your tidybulk workflow. The references are in BibTeX format and can be imported into your reference manager.
 
 ```{r}
-get_bibliography(counts_de)
+get_bibliography(counts_egsea)
 ```
 
 
